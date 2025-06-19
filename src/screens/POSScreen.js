@@ -45,7 +45,7 @@ async function ensurePermissions() {
 
 export default function POSScreen({ route }) {
   // fallback if route.params is undefined
-  const locationId = route?.params?.locationId ?? "tml_GEjbPQTfclbOg7";
+  const locationId = route?.params?.locationId ?? "tml_GFEg3wJIcP3uqE";
   const [readers, setReaders] = useState([]);
   const [connectedReaderId, setConnectedReaderId] = useState(null);
   const [isProcessing, setProcessing] = useState(false);
@@ -61,6 +61,7 @@ export default function POSScreen({ route }) {
   }, [locationId]);
 
   const handleConnect = (readerId) => {
+    console.log("Attempting to connect reader:", readerId);
     setProcessing(true);
     Tap.connectReader(readerId, locationId)
       .then(() => {
