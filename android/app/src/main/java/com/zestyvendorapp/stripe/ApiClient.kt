@@ -11,7 +11,7 @@ import java.io.IOException
  * Singleton for making network calls to your backend.
  */
 object ApiClient {
-  private const val BASE_URL = "http://192.168.232.21:3000/"
+  private const val BASE_URL = "https://zestybakers.com/wp-json/zesty-terminal/v1/"
 
   private val client = OkHttpClient.Builder().build()
   private val retrofit = Retrofit.Builder()
@@ -39,13 +39,10 @@ object ApiClient {
     skipTipping: Boolean,
     callback: Callback<PaymentIntentCreationResponse>
   ) {
-    val params = mutableMapOf<String, String>().apply {
+  val params = mutableMapOf<String, String>().apply {
       put("amount", amount.toString())
-      put("currency", currency)
-      if (skipTipping) {
-        put("payment_method_options[card_present][skip_tipping]", "true")
-      }
-    }
-    service.createPaymentIntent(params).enqueue(callback)
+      put("locationId", "tml_GFEg3wJIcP3uqE")  
+  }
+  service.createPaymentIntent(params).enqueue(callback)
   }
 }
