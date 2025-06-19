@@ -20,9 +20,6 @@ import OrderDetailsScreen from './src/screens/OrderDetailsScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import CustomDrawerContent from './src/screens/CustomDrawerContent';
 
-
-import { StripeTerminalProvider } from '@stripe/stripe-terminal-react-native';
-
 MaterialCommunityIcons.loadFont();
 
 const Stack = createStackNavigator();
@@ -37,24 +34,6 @@ const theme = {
   },
 };
 
-// ← helper to fetch your connection token
-const fetchConnectionToken = async () => {
-  try {
-    const res = await fetch('http://192.168.1.6:3000/connection_token', {
-      method: 'POST',
-    });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const { secret } = await res.json();
-    console.log('✅ connection token:', secret);
-    return secret;
-  } catch (err) {
-    console.error('❌ fetchConnectionToken error:', err);
-    throw err; // rethrow so the SDK sees the failure
-  }
-};
-
 function AppDrawer() {
   return (
     <Drawer.Navigator
@@ -64,7 +43,11 @@ function AppDrawer() {
     >
       <Drawer.Screen name="MainTabs" component={MainTabs} />
       <Drawer.Screen name="Orders" component={OrdersScreen} />
-      <Drawer.Screen name="POS" component={POSScreen} />
+      <Drawer.Screen
+        name="POS"
+        component={POSScreen}
+        initialParams={{ locationId: "tml_GEjbPQTfclbOg7" }}
+      />
     </Drawer.Navigator>
   );
 }
@@ -97,49 +80,43 @@ export default function App() {
   }
 
   return (
-    <StripeTerminalProvider
-      tokenProvider={fetchConnectionToken}
-      logLevel="info"
-      simulated={true}
-    >
-      <PaperProvider theme={theme}>
-        <NavigationContainer>
-          <Stack.Navigator initialRouteName="DefaultLogin">
-            <Stack.Screen
-              name="DefaultLogin"
-              component={DefaultLogin}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Splash"
-              component={SplashScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="Signup" component={SignupScreen} />
-            <Stack.Screen
-              name="Home"
-              component={AppDrawer}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="OrderDetails"
-              component={OrderDetailsScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="UpdateStore"
-              component={UpdateStoreScreen}
-              options={{ headerShown: false }}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </PaperProvider>
-    </StripeTerminalProvider>
+    <PaperProvider theme={theme}>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName="DefaultLogin">
+          <Stack.Screen
+            name="DefaultLogin"
+            component={DefaultLogin}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Splash"
+            component={SplashScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="Signup" component={SignupScreen} />
+          <Stack.Screen
+            name="Home"
+            component={AppDrawer}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="OrderDetails"
+            component={OrderDetailsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="UpdateStore"
+            component={UpdateStoreScreen}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </PaperProvider>
   );
 }
 
