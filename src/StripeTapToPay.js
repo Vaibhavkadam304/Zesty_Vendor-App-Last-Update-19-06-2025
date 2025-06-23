@@ -25,8 +25,11 @@ export function discoverReaders(locationId, onUpdate) {
 }
 
 /** Connect to a reader by its ID */
-export function connectReader(readerId, locationId) {
-  return StripeTapToPay.connectReader(readerId, locationId);
+export function connectReader(locationId) {
+  if (!locationId) {
+    return Promise.reject(new Error("Location ID is required"));
+  }
+  return StripeTapToPay.connectReader(locationId);
 }
 
 /** Collect and process a payment in one go */

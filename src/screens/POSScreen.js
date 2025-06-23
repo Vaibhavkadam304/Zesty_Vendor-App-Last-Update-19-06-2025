@@ -45,7 +45,7 @@ async function ensurePermissions() {
 
 export default function POSScreen({ route }) {
   // fallback if route.params is undefined
-  const locationId = route?.params?.locationId ?? "tml_GFEg3wJIcP3uqE";
+  const locationId = route?.params?.locationId ?? "tml_GFZlfAmzFCGtcQ";
   const [readers, setReaders] = useState([]);
   const [connectedReaderId, setConnectedReaderId] = useState(null);
   const [isProcessing, setProcessing] = useState(false);
@@ -60,13 +60,12 @@ export default function POSScreen({ route }) {
     });
   }, [locationId]);
 
-  const handleConnect = (readerId) => {
-    console.log("Attempting to connect reader:", readerId);
+  const handleConnect = () => {
     setProcessing(true);
-    Tap.connectReader(readerId, locationId)
+    Tap.connectReader(locationId)  // Only pass locationId
       .then(() => {
-        setConnectedReaderId(readerId);
-        Alert.alert("Connected", `Reader ${readerId} connected`);
+        setConnectedReaderId("local-mobile");  // You can hardcode it for now
+        Alert.alert("Connected", "Reader connected");
       })
       .catch(err => Alert.alert("Connect error", err.message))
       .finally(() => setProcessing(false));
@@ -88,14 +87,14 @@ export default function POSScreen({ route }) {
       <Text style={styles.title}>Available Readers</Text>
       <FlatList
         data={readers}
-        keyExtractor={r => r.id}
+        keyExtractor={(item, index) => `reader-${index}`}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <Text style={styles.label}>{item.label}</Text>
             <Button
-              title={connectedReaderId === item.id ? "Connected" : "Connect"}
-              disabled={connectedReaderId === item.id || isProcessing}
-              onPress={() => handleConnect(item.id)}
+              title={connectedReaderId ? "Connected" : "Connect"}
+              disabled={connectedReaderId != null || isProcessing}
+              onPress={handleConnect}
             />
           </View>
         )}
