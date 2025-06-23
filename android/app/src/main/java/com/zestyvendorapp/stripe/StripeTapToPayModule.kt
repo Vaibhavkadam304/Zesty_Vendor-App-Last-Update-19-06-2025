@@ -103,31 +103,33 @@ class StripeTapToPayModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun connectReader(readerId: String, locationId: String, promise: Promise) {
-    Log.d("StripeTapToPay", "Attempting to connect to readerId: $readerId for locationId: $locationId")
-    val reader = discoveredReaders.find { it.id == readerId }
-    if (reader == null) {
-      Log.e("StripeTapToPay", "No reader found with id: $readerId")
-      promise.reject("NO_READER", "No reader found with id $readerId")
-      return
-    }
+  fun connectReader(locationId: String, promise: Promise) {
+      Log.d("StripeTapToPay", "Attempting to connect to first discovered reader for locationId: $locationId")
 
-    val connConfig = ConnectionConfiguration.LocalMobileConnectionConfiguration(locationId)
-    Terminal.getInstance().connectLocalMobileReader(
-      reader,
-      connConfig,
-      object : ReaderCallback {
-        override fun onSuccess(connectedReader: Reader) {
-          Log.d("StripeTapToPay", "Successfully connected to reader: ${connectedReader.serialNumber}")
-          promise.resolve(null)
-        }
-
-        override fun onFailure(e: TerminalException) {
-          Log.e("StripeTapToPay", "Failed to connect to reader: ${e.errorMessage}")
-          promise.reject("CONNECT_ERROR", e.localizedMessage)
-        }
+      if (discoveredReaders.isEmpty()) {
+          Log.e("StripeTapToPay", "No readers discovered")
+          promise.reject("NO_READER", "No readers discovered")
+          return
       }
-    )
+
+      val reader = discoveredReaders[0]  // <-- Always take first reader (your local Android Tap-to-Pay device)
+
+      val connConfig = ConnectionConfiguration.LocalMobileConnectionConfiguration(locationId)
+      Terminal.getInstance().connectLocalMobileReader(
+          reader,
+          connConfig,
+          object : ReaderCallback {
+              override fun onSuccess(connectedReader: Reader) {
+                  Log.d("StripeTapToPay", "Successfully connected to reader: ${connectedReader.serialNumber}")
+                  promise.resolve(null)
+              }
+
+              override fun onFailure(e: TerminalException) {
+                  Log.e("StripeTapToPay", "Failed to connect to reader: ${e.errorMessage}")
+                  promise.reject("CONNECT_ERROR", e.localizedMessage)
+              }
+          }
+      )
   }
 
   @ReactMethod
@@ -147,7 +149,10 @@ class StripeTapToPayModule(reactContext: ReactApplicationContext) :
           call: Call<PaymentIntentCreationResponse>,
           response: Response<PaymentIntentCreationResponse>
         ) {
-          val secret = response.body()?.secret
+          Log.d("StripeTapToPay", "API raw response: ${response.raw()}")
+          Log.d("StripeTapToPay", "API response body: ${response.body()}")
+          Log.d("StripeTapToPay", "createPaymentIntent Response: isSuccessful=${response.isSuccessful}, HTTP code=${response.code()}")
+          val secret = response.body()?.paymentIntent?.client_secret
           if (secret == null) {
             Log.e("StripeTapToPay", "Backend returned null client secret")
             promise.reject("BACKEND_ERROR", "No client secret in response")

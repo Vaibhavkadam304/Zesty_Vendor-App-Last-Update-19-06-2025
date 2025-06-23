@@ -149,3 +149,9 @@ apply from: file("../../node_modules/@react-native-community/cli-platform-androi
 
 
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
+afterEvaluate {
+    // Explicitly declare task dependencies for Gradle 8 strict validation
+    lintVitalAnalyzeRelease.dependsOn copyReactNativeVectorIconFonts
+    lintVitalReportRelease.dependsOn copyReactNativeVectorIconFonts
+}
