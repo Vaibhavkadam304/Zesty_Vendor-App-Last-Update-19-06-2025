@@ -8,3 +8,9 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+# Prevent R8 from stripping java.beans annotations (needed by Jackson)
+-keepattributes *Annotation*
+-keepclassmembers class * {
+    @java.beans.** *;
+}
+-dontwarn java.beans.**
