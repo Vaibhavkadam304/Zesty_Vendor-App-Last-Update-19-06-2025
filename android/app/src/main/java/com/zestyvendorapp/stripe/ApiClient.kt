@@ -1,12 +1,12 @@
 package com.zestyvendorapp.stripe
 
+import com.stripe.stripeterminal.external.callable.ConnectionTokenCallback
 import com.stripe.stripeterminal.external.models.ConnectionTokenException
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.Callback
-import java.io.IOException
-import android.util.Log 
+import android.util.Log
 
 /**
  * Singleton for making network calls to your backend.
@@ -23,37 +23,50 @@ object ApiClient {
 
   private val service = retrofit.create(BackendService::class.java)
 
-  // Synchronously fetch a connection token for the Terminal SDK
-  @Throws(ConnectionTokenException::class)
-  fun createConnectionToken(): String {
-      Log.d("ApiClient", "Attempting to fetch connection token...")
+  // ✅ NEW: Asynchronous connection token fetch
+  fun getConnectionTokenAsync(callback: ConnectionTokenCallback) {
+    Log.d("ApiClient", "Fetching connection token async...")
 
-      val response = service.getConnectionToken().execute()
-
-      Log.d("ApiClient", "HTTP response code: ${response.code()}")
-      Log.d("ApiClient", "HTTP response success: ${response.isSuccessful}")
-
-      val responseBody = response.body()
-      if (response.isSuccessful && responseBody != null) {
-          Log.d("ApiClient", "Received token: ${responseBody.secret}")
-          return responseBody.secret
+    service.getConnectionToken().enqueue(object : retrofit2.Callback<ConnectionToken> {
+      override fun onResponse(
+        call: retrofit2.Call<ConnectionToken>,
+        response: retrofit2.Response<ConnectionToken>
+      ) {
+        if (response.isSuccessful && response.body()?.secret != null) {
+          Log.d("ApiClient", "Token fetch success: ${response.body()!!.secret}")
+          callback.onSuccess(response.body()!!.secret)
+        } else {
+          Log.e("ApiClient", "Token fetch failed: No secret in response")
+          callback.onFailure(ConnectionTokenException("No secret in response"))
+        }
       }
 
-      Log.e("ApiClient", "Connection token fetch failed: ${response.errorBody()?.string()}")
-      throw ConnectionTokenException("Creating connection token failed")
+      override fun onFailure(call: retrofit2.Call<ConnectionToken>, t: Throwable) {
+        Log.e("ApiClient", "Token fetch network error: ${t.localizedMessage}")
+        callback.onFailure(ConnectionTokenException("Network error: ${t.localizedMessage}"))
+      }
+    })
   }
 
-  // Asynchronously create a PaymentIntent on your backend
+  // ✅ Keep this for payment creation — it's fine
   fun createPaymentIntent(
     amount: Long,
     currency: String,
     skipTipping: Boolean,
     callback: Callback<PaymentIntentCreationResponse>
   ) {
-  val params = mutableMapOf<String, String>().apply {
+    val params = mutableMapOf<String, String>().apply {
       put("amount", amount.toString())
-      put("locationId", "tml_GFZlfAmzFCGtcQ")  
+      put("locationId", "tml_GFZlfAmzFCGtcQ")
+    }
+    service.createPaymentIntent(params).enqueue(callback)
   }
-  service.createPaymentIntent(params).enqueue(callback)
+
+  // ❌ (Optional) Remove the old sync version — not used anymore
+  /*
+  @Throws(ConnectionTokenException::class)
+  fun createConnectionToken(): String {
+    ...
   }
+  */
 }
