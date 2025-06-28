@@ -89,7 +89,7 @@ android {
         applicationId "com.zestyvendorapp"
         minSdkVersion 26                   // ✅ Set here!
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
+        versionCode 6
         versionName "1.0.2"
     }
     compileOptions {
