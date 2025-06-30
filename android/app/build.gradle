@@ -89,7 +89,7 @@ android {
         applicationId "com.zestyvendorapp"
         minSdkVersion 26                   // ✅ Set here!
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
+        versionCode 8
         versionName "1.0.2"
     }
     compileOptions {
@@ -119,8 +119,9 @@ android {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.release
-            minifyEnabled true // or use enableProguardInReleaseBuilds if defined elsewhere
-            shrinkResources true
+            debuggable true             
+            minifyEnabled false // or use enableProguardInReleaseBuilds if defined elsewhere
+            shrinkResources false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
@@ -184,12 +185,4 @@ android.applicationVariants.all { variant ->
       dependsOn(bundleTask)
     }
   }
-}
- 
-
-
-afterEvaluate {
-    // Explicitly declare task dependencies for Gradle 8 strict validation
-    lintVitalAnalyzeRelease.dependsOn copyReactNativeVectorIconFonts
-    lintVitalReportRelease.dependsOn copyReactNativeVectorIconFonts
 }
