@@ -4,7 +4,7 @@ import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter
 import com.stripe.stripeterminal.Terminal
-import com.stripe.stripeterminal.external.callable.ConnectionTokenProvider
+import com.zestyvendorapp.stripe.ConnectionTokenProvider
 import com.stripe.stripeterminal.external.callable.DiscoveryListener
 import com.stripe.stripeterminal.external.callable.ReaderCallback
 import com.stripe.stripeterminal.external.callable.PaymentIntentCallback
