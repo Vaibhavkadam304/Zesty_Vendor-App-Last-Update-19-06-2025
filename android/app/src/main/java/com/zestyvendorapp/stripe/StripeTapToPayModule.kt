@@ -3,21 +3,22 @@ package com.zestyvendorapp.stripe
 import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter
+import com.stripe.stripeterminal.TapToPay
 import com.stripe.stripeterminal.Terminal
-import com.zestyvendorapp.stripe.ConnectionTokenProvider
-import com.stripe.stripeterminal.external.callable.DiscoveryListener
-import com.stripe.stripeterminal.external.callable.ReaderCallback
-import com.stripe.stripeterminal.external.callable.PaymentIntentCallback
-import com.stripe.stripeterminal.external.callable.Callback as TerminalCallback
-import com.stripe.stripeterminal.external.models.*
-import com.stripe.stripeterminal.log.LogLevel
-import retrofit2.Call
-import retrofit2.Callback as RetrofitCallback
-import retrofit2.Response
+import com.stripe.stripeterminal.ApplicationDelegate as TerminalApplicationDelegate
+import com.stripe.stripeterminal.callable.ReaderCallback
+import com.stripe.stripeterminal.callable.PaymentIntentCallback
+import com.stripe.stripeterminal.callable.ConnectionTokenCallback
+import com.stripe.stripeterminal.exception.TerminalException
+import com.stripe.stripeterminal.listener.TerminalListener
+import com.stripe.stripeterminal.model.Reader
+import com.stripe.stripeterminal.model.PaymentIntent
+import com.stripe.stripeterminal.callable.CollectConfiguration
+import com.stripe.stripeterminal.taptopay.TapToPayDiscoveryConfiguration
+import com.stripe.stripeterminal.taptopay.TapToPayConnectionConfiguration
+import com.stripe.stripeterminal.taptopay.TapToPayReaderListener
 
-class StripeTapToPayModule(reactContext: ReactApplicationContext) :
-  ReactContextBaseJavaModule(reactContext) {
-
+class StripeTapToPayModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   companion object {
     private var isTerminalInitialized = false
   }
@@ -30,106 +31,100 @@ class StripeTapToPayModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun initialize(promise: Promise) {
     try {
-      if (!isTerminalInitialized) {
-        Log.d("StripeTapToPay", "Initializing Terminal SDK")
+      // Skip SDK init inside the TapToPay process
+      if (!isTerminalInitialized && !TapToPay.isInTapToPayProcess()) {
+        // Application lifecycle delegate must be called once
+        TerminalApplicationDelegate.onCreate(jsContext.applicationContext as Application)
+
         Terminal.initTerminal(
           jsContext.applicationContext,
-          LogLevel.VERBOSE,
-          ConnectionTokenProvider(),
-          object : com.stripe.stripeterminal.external.callable.TerminalListener {
+          com.stripe.stripeterminal.LogLevel.VERBOSE,
+          ConnectionTokenProviderImpl(),
+          object : TerminalListener {
+            override fun onConnectionStatusChange(status: com.stripe.stripeterminal.listener.ConnectionStatus) {
+              Log.d("StripeTapToPay", "Connection status: $status")
+            }
             override fun onUnexpectedReaderDisconnect(reader: Reader) {
-              Log.w("StripeTapToPay", "Unexpected reader disconnect: ${reader.serialNumber}")
+              Log.w("StripeTapToPay", "Unexpected disconnect: ${'$'}{reader.serialNumber}")
             }
-            override fun onConnectionStatusChange(status: ConnectionStatus) {
-              Log.d("StripeTapToPay", "Connection status changed: $status")
-            }
-            override fun onPaymentStatusChange(status: PaymentStatus) {
-              Log.d("StripeTapToPay", "Payment status changed: $status")
+            override fun onPaymentStatusChange(status: com.stripe.stripeterminal.listener.PaymentStatus) {
+              Log.d("StripeTapToPay", "Payment status: $status")
             }
           }
         )
         isTerminalInitialized = true
-      } else {
-        Log.d("StripeTapToPay", "Terminal already initialized. Skipping re-init.")
       }
       promise.resolve(null)
-    } catch (e: TerminalException) {
-      Log.e("StripeTapToPay", "Initialization error: ${e.errorMessage}")
-      promise.reject("INIT_ERROR", e.localizedMessage)
+    } catch (e: Exception) {
+      promise.reject("INIT_ERROR", e.localizedMessage, e)
     }
   }
 
   @ReactMethod
-  fun discoverReaders(locationId: String, promise: Promise) {
-    Log.d("StripeTapToPay", "Starting discoverReaders with locationId: $locationId")
-
-    val config = DiscoveryConfiguration(
-      timeout = 10,
-      discoveryMethod = DiscoveryMethod.LOCAL_MOBILE,
-      isSimulated = false,
-      location = locationId
+  fun discoverReaders(promise: Promise) {
+    val config = TapToPayDiscoveryConfiguration(
+      isSimulated = BuildConfig.DEBUG
     )
 
     Terminal.getInstance().discoverReaders(
       config,
-      object : DiscoveryListener {
+      object : com.stripe.stripeterminal.discovery.DiscoveryListener {
         override fun onUpdateDiscoveredReaders(readers: List<Reader>) {
-          Log.d("StripeTapToPay", "Discovered ${readers.size} readers")
-          readers.forEach { Log.d("StripeTapToPay", "Reader: ${it.id}, label: ${it.deviceType}") }
           discoveredReaders = readers
-          val arr = Arguments.createArray()
-          readers.forEach { r ->
-            Arguments.createMap().apply {
-              putString("id", r.id)
-              putString("label", r.deviceType.toString())
-            }.also { arr.pushMap(it) }
+          val arr = Arguments.createArray().apply {
+            readers.forEach { r ->
+              val map = Arguments.createMap()
+              map.putString("id", r.id)
+              map.putString("label", r.deviceType.toString())
+              pushMap(map)
+            }
           }
-          jsContext
-            .getJSModule(RCTDeviceEventEmitter::class.java)
+          jsContext.getJSModule(RCTDeviceEventEmitter::class.java)
             .emit("readersDiscovered", arr)
-        }
-      },
-      object : TerminalCallback {
-        override fun onSuccess() {
-          Log.d("StripeTapToPay", "Reader discovery completed successfully")
           promise.resolve(null)
         }
         override fun onFailure(e: TerminalException) {
-          Log.e("StripeTapToPay", "Discovery failed: ${e.errorMessage}")
-          promise.reject("DISCOVER_ERROR", e.localizedMessage)
+          promise.reject("DISCOVER_ERROR", e.localizedMessage, e)
         }
+      },
+      object : com.stripe.stripeterminal.callable.Callback {
+        override fun onSuccess() {}
+        override fun onFailure(e: TerminalException) {}
       }
     )
   }
 
   @ReactMethod
-  fun connectReader(locationId: String, promise: Promise) {
-      Log.d("StripeTapToPay", "Attempting to connect to first discovered reader for locationId: $locationId")
-
-      if (discoveredReaders.isEmpty()) {
-          Log.e("StripeTapToPay", "No readers discovered")
-          promise.reject("NO_READER", "No readers discovered")
-          return
+  fun connectReader(promise: Promise) {
+    if (discoveredReaders.isEmpty()) {
+      promise.reject("NO_READER", "No readers discovered")
+      return
+    }
+    val config = TapToPayConnectionConfiguration(
+      locationId = "tml_GFZlfAmzFCGtcQ",
+      autoReconnectOnUnexpectedDisconnect = true,
+      readerListener = object : TapToPayReaderListener {
+        override fun onDisconnect(reason: com.stripe.stripeterminal.taptopay.DisconnectReason) {
+          Log.w("StripeTapToPay", "Reader disconnected: $reason")
+        }
+        override fun onReaderReconnectStarted(reader: Reader, cancelReconnect: com.stripe.stripeterminal.callable.Cancelable, reason: com.stripe.stripeterminal.taptopay.DisconnectReason) {}
+        override fun onReaderReconnectSucceeded(reader: Reader) {}
+        override fun onReaderReconnectFailed(reader: Reader) {}
       }
+    )
 
-      val reader = discoveredReaders[0]  // <-- Always take first reader (your local Android Tap-to-Pay device)
-
-      val connConfig = ConnectionConfiguration.LocalMobileConnectionConfiguration(locationId)
-      Terminal.getInstance().connectLocalMobileReader(
-          reader,
-          connConfig,
-          object : ReaderCallback {
-              override fun onSuccess(connectedReader: Reader) {
-                  Log.d("StripeTapToPay", "Successfully connected to reader: ${connectedReader.serialNumber}")
-                  promise.resolve(null)
-              }
-
-              override fun onFailure(e: TerminalException) {
-                  Log.e("StripeTapToPay", "Failed to connect to reader: ${e.errorMessage}")
-                  promise.reject("CONNECT_ERROR", e.localizedMessage)
-              }
-          }
-      )
+    Terminal.getInstance().connectReader(
+      discoveredReaders.first(),
+      config,
+      object : ReaderCallback {
+        override fun onSuccess(reader: Reader) {
+          promise.resolve(null)
+        }
+        override fun onFailure(e: TerminalException) {
+          promise.reject("CONNECT_ERROR", e.localizedMessage, e)
+        }
+      }
+    )
   }
 
   @ReactMethod
@@ -139,71 +134,55 @@ class StripeTapToPayModule(reactContext: ReactApplicationContext) :
     skipTipping: Boolean,
     promise: Promise
   ) {
-    Log.d("StripeTapToPay", "Starting collectAndProcessPayment for amount: $amount $currency")
     ApiClient.createPaymentIntent(
-      (amount * 100).toLong(),
-      currency,
-      skipTipping,
-      object : RetrofitCallback<PaymentIntentCreationResponse> {
+      (amount * 100).toLong(), currency, skipTipping,
+      object : retrofit2.Callback<PaymentIntentCreationResponse> {
         override fun onResponse(
-          call: Call<PaymentIntentCreationResponse>,
-          response: Response<PaymentIntentCreationResponse>
+          call: retrofit2.Call<PaymentIntentCreationResponse>,
+          response: retrofit2.Response<PaymentIntentCreationResponse>
         ) {
-          Log.d("StripeTapToPay", "API raw response: ${response.raw()}")
-          Log.d("StripeTapToPay", "API response body: ${response.body()}")
-          Log.d("StripeTapToPay", "createPaymentIntent Response: isSuccessful=${response.isSuccessful}, HTTP code=${response.code()}")
           val secret = response.body()?.paymentIntent?.client_secret
-          if (secret == null) {
-            Log.e("StripeTapToPay", "Backend returned null client secret")
-            promise.reject("BACKEND_ERROR", "No client secret in response")
+          if (secret.isNullOrEmpty()) {
+            promise.reject("BACKEND_ERROR", "No client secret")
             return
           }
-          Log.d("StripeTapToPay", "Retrieved client secret successfully")
           Terminal.getInstance().retrievePaymentIntent(
             secret,
             object : PaymentIntentCallback {
               override fun onSuccess(pi: PaymentIntent) {
-                Log.d("StripeTapToPay", "PaymentIntent retrieved successfully")
                 val collectConfig = CollectConfiguration.Builder()
                   .skipTipping(skipTipping)
                   .build()
                 Terminal.getInstance().collectPaymentMethod(
-                  pi,
+                  pi, collectConfig,
                   object : PaymentIntentCallback {
-                    override fun onSuccess(pi: PaymentIntent) {
-                      Log.d("StripeTapToPay", "PaymentMethod collected successfully")
+                    override fun onSuccess(collectedPi: PaymentIntent) {
                       Terminal.getInstance().processPayment(
-                        pi,
+                        collectedPi,
                         object : PaymentIntentCallback {
-                          override fun onSuccess(pi: PaymentIntent) {
-                            Log.d("StripeTapToPay", "Payment processed successfully")
+                          override fun onSuccess(p: PaymentIntent) {
                             promise.resolve(null)
                           }
                           override fun onFailure(e: TerminalException) {
-                            Log.e("StripeTapToPay", "Processing payment failed: ${e.errorMessage}")
-                            promise.reject("PROCESS_ERROR", e.localizedMessage)
+                            promise.reject("PROCESS_ERROR", e.localizedMessage, e)
                           }
                         }
                       )
                     }
                     override fun onFailure(e: TerminalException) {
-                      Log.e("StripeTapToPay", "Collect payment failed: ${e.errorMessage}")
-                      promise.reject("COLLECT_ERROR", e.localizedMessage)
+                      promise.reject("COLLECT_ERROR", e.localizedMessage, e)
                     }
-                  },
-                  collectConfig
+                  }
                 )
               }
               override fun onFailure(e: TerminalException) {
-                Log.e("StripeTapToPay", "Retrieve PaymentIntent failed: ${e.errorMessage}")
-                promise.reject("RETRIEVE_ERROR", e.localizedMessage)
+                promise.reject("RETRIEVE_ERROR", e.localizedMessage, e)
               }
             }
           )
         }
-        override fun onFailure(call: Call<PaymentIntentCreationResponse>, t: Throwable) {
-          Log.e("StripeTapToPay", "Backend call failed: ${t.localizedMessage}")
-          promise.reject("BACKEND_ERROR", t.localizedMessage)
+        override fun onFailure(call: retrofit2.Call<PaymentIntentCreationResponse>, t: Throwable) {
+          promise.reject("BACKEND_ERROR", t.localizedMessage, t)
         }
       }
     )

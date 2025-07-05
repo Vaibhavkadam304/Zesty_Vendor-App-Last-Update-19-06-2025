@@ -1,20 +1,27 @@
 buildscript {
     ext {
-        buildToolsVersion = "34.0.0"
-        minSdkVersion = 26
-        compileSdkVersion = 34
-        targetSdkVersion = 34
-        ndkVersion = "25.1.8937393"
-        kotlinVersion = "1.9.10"
+        buildToolsVersion   = "34.0.0"
+        minSdkVersion       = 26
+        compileSdkVersion   = 34
+        targetSdkVersion    = 34
+        ndkVersion          = "25.1.8937393"
+        kotlinVersion       = "1.9.10"
     }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle")
+        classpath("com.android.tools.build:gradle:8.1.1")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+    }
+}
+
+// Force a compatible Jackson to dodge Java 21 errors
+configurations.all {
+    resolutionStrategy {
+        force 'com.fasterxml.jackson.core:jackson-core:2.13.4'
     }
 }
 
@@ -22,16 +29,25 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-         // Stripe SDK
-        maven {
-            url "https://storage.googleapis.com/rn-stripe-releases/"
-        }
-    }
 
-    // ✅ Force compatible Jackson version to avoid Java 21 error
-    configurations.all {
-        resolutionStrategy {
-            force 'com.fasterxml.jackson.core:jackson-core:2.13.4'
+        // RN async-storage et al. will inject their repos, but since
+        // we’re back on allprojects repos they’ll be picked up fine.
+
+        // Stripe Terminal SDK:
+        maven { url 'https://storage.googleapis.com/rn-stripe-releases/' }
+
+        maven {
+            url "https://artifacts.stripe.com/maven"
+            credentials {
+                def stripeUser = project.hasProperty("STRIPE_MAVEN_USERNAME") ? project.property("STRIPE_MAVEN_USERNAME") : System.getenv("STRIPE_MAVEN_USERNAME")
+                def stripePass = project.hasProperty("STRIPE_MAVEN_PASSWORD") ? project.property("STRIPE_MAVEN_PASSWORD") : System.getenv("STRIPE_MAVEN_PASSWORD")
+
+                println "Stripe username: ${stripeUser}"
+                println "Stripe password: ${stripePass != null ? stripePass.substring(0, 5) + '*****' : 'null'}"
+
+                username = stripeUser
+                password = stripePass
+            }
         }
     }
 }
