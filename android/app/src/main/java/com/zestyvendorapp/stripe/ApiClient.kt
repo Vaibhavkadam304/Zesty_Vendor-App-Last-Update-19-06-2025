@@ -1,12 +1,12 @@
 package com.zestyvendorapp.stripe
 
-import com.stripe.stripeterminal.external.callable.ConnectionTokenCallback
-import com.stripe.stripeterminal.external.models.ConnectionTokenException
+import android.util.Log
+import com.stripe.stripeterminal.callable.ConnectionTokenCallback
+import com.stripe.stripeterminal.exception.ConnectionTokenException
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.Callback
-import android.util.Log
 
 /**
  * Singleton for making network calls to your backend.
@@ -23,7 +23,9 @@ object ApiClient {
 
   private val service = retrofit.create(BackendService::class.java)
 
-  // ✅ NEW: Asynchronous connection token fetch
+  /**
+   * Fetches the connection token asynchronously for the Terminal SDK.
+   */
   fun getConnectionTokenAsync(callback: ConnectionTokenCallback) {
     Log.d("ApiClient", "Fetching connection token async...")
 
@@ -33,8 +35,9 @@ object ApiClient {
         response: retrofit2.Response<ConnectionToken>
       ) {
         if (response.isSuccessful && response.body()?.secret != null) {
-          Log.d("ApiClient", "Token fetch success: ${response.body()!!.secret}")
-          callback.onSuccess(response.body()!!.secret)
+          val secret = response.body()!!.secret
+          Log.d("ApiClient", "Token fetch success: $secret")
+          callback.onSuccess(secret)
         } else {
           Log.e("ApiClient", "Token fetch failed: No secret in response")
           callback.onFailure(ConnectionTokenException("No secret in response"))
@@ -48,7 +51,9 @@ object ApiClient {
     })
   }
 
-  // ✅ Keep this for payment creation — it's fine
+  /**
+   * Creates a PaymentIntent via your backend.
+   */
   fun createPaymentIntent(
     amount: Long,
     currency: String,
@@ -57,16 +62,9 @@ object ApiClient {
   ) {
     val params = mutableMapOf<String, String>().apply {
       put("amount", amount.toString())
+      put("currency", currency)
       put("locationId", "tml_GFZlfAmzFCGtcQ")
     }
     service.createPaymentIntent(params).enqueue(callback)
   }
-
-  // ❌ (Optional) Remove the old sync version — not used anymore
-  /*
-  @Throws(ConnectionTokenException::class)
-  fun createConnectionToken(): String {
-    ...
-  }
-  */
 }

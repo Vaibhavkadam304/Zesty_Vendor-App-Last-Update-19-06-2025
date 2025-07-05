@@ -1,29 +1,29 @@
 package com.zestyvendorapp.stripe
 
 import android.util.Log
-import com.stripe.stripeterminal.external.callable.ConnectionTokenCallback
-import com.stripe.stripeterminal.external.callable.ConnectionTokenProvider as StripeConnectionTokenProvider
-import com.stripe.stripeterminal.external.models.ConnectionTokenException
+import com.stripe.stripeterminal.TapToPay
+import com.stripe.stripeterminal.callable.ConnectionTokenProvider
+import com.stripe.stripeterminal.callable.ConnectionTokenCallback
+import com.stripe.stripeterminal.exception.TerminalException
 
 /**
- * Your implementation of Stripe’s ConnectionTokenProvider,
- * now with entry/exit logging so you see exactly what’s happening.
+ * Provides new connection tokens to the Stripe Terminal SDK.
+ * Skips execution when in the TapToPay process.
  */
-class ConnectionTokenProvider : StripeConnectionTokenProvider {
-
+class ConnectionTokenProviderImpl : ConnectionTokenProvider {
   override fun fetchConnectionToken(callback: ConnectionTokenCallback) {
-    Log.d("StripeTapToPay", ">> fetchConnectionToken() invoked")
+    // Avoid initializing inside the isolated TapToPay process
+    if (TapToPay.isInTapToPayProcess()) return
 
-    // Wrap the callback so we can log success/failure at this boundary
+    Log.d("StripeTapToPay", ">> fetchConnectionToken()")
     ApiClient.getConnectionTokenAsync(object : ConnectionTokenCallback {
       override fun onSuccess(token: String) {
-        Log.d("StripeTapToPay", "<< fetchConnectionToken success, token=$token")
+        Log.d("StripeTapToPay", "<< got token: $token")
         callback.onSuccess(token)
       }
-
-      override fun onFailure(exception: ConnectionTokenException) {
-        Log.e("StripeTapToPay", "<< fetchConnectionToken failure", exception)
-        callback.onFailure(exception)
+      override fun onFailure(e: TerminalException) {
+        Log.e("StripeTapToPay", "<< token failure", e)
+        callback.onFailure(e)
       }
     })
   }

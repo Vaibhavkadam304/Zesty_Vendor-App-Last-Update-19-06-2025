@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  fetch:
+  fetch-aars:
     runs-on: ubuntu-latest
 
     steps:

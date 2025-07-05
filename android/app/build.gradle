@@ -137,8 +137,10 @@ dependencies {
     implementation "com.squareup.retrofit2:retrofit:$retrofit_version"
     implementation "com.squareup.retrofit2:converter-gson:$retrofit_version"
 
-    implementation "com.stripe:stripeterminal-core:2.20.0"
-    implementation "com.stripe:stripeterminal-localmobile:2.20.0"
+    implementation "com.stripe.stripeterminal:stripeterminal-core:4.5.0"
+    implementation "com.stripe.stripeterminal:stripeterminal-taptopay:4.5.0"
+    implementation "com.stripe.stripeterminal:stripeterminal-external:4.5.0"
+
 
   
     // ✅ Hermes or JSC
@@ -173,16 +175,3 @@ apply from: file("../../node_modules/@react-native-community/cli-platform-androi
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Make sure React Native’s JS-bundling runs before assets are merged
-// for every variant (debug & release)
-// ─────────────────────────────────────────────────────────────────────────────
-android.applicationVariants.all { variant ->
-  def name = variant.name.capitalize()           // e.g. "Debug" or "Release"
-  def bundleTask = tasks.findByName("bundle${name}JsAndAssets")
-  if (bundleTask != null) {
-    variant.mergeAssetsProvider.configure {
-      dependsOn(bundleTask)
-    }
-  }
-}

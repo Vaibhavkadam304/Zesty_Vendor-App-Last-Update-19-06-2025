@@ -1,4 +1,10 @@
 rootProject.name = 'ZestyVendorApp'
-apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
-include ':app'
+
+// Native Modules
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesSettingsGradle(settings)
+
+// Bring in the RN Gradle plugin so `com.facebook.react` works
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+include ':app'
