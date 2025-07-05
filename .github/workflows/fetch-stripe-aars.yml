@@ -51,7 +51,7 @@ jobs:
         run: ./gradlew clean build
 
       - name: Upload AARs as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: stripe-aars
           path: fetch-aar/build/stripe-aars/
