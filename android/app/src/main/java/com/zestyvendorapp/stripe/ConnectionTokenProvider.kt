@@ -1,10 +1,10 @@
 package com.zestyvendorapp.stripe
 
 import android.util.Log
-import com.stripe.stripeterminal.TapToPay
-import com.stripe.stripeterminal.callable.ConnectionTokenProvider
-import com.stripe.stripeterminal.callable.ConnectionTokenCallback
-import com.stripe.stripeterminal.exception.TerminalException
+import com.stripe.stripeterminal.external.provider.ConnectionTokenProvider
+import com.stripe.stripeterminal.external.models.ConnectionTokenCallback
+import com.stripe.stripeterminal.external.models.ConnectionTokenException
+import com.stripe.stripeterminal.tap2pay.TapToPay           
 
 /**
  * Provides new connection tokens to the Stripe Terminal SDK.

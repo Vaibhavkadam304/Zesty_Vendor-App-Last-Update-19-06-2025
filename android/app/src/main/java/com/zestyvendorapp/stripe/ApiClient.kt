@@ -1,8 +1,8 @@
 package com.zestyvendorapp.stripe
 
 import android.util.Log
-import com.stripe.stripeterminal.callable.ConnectionTokenCallback
-import com.stripe.stripeterminal.exception.ConnectionTokenException
+import com.stripe.stripeterminal.external.models.ConnectionTokenCallback
+import com.stripe.stripeterminal.external.models.ConnectionTokenException
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

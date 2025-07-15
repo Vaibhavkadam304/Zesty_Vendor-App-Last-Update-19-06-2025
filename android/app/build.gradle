@@ -79,6 +79,20 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
 
+// Add this block *before* the android { } section:
+repositories {
+    google()
+    mavenCentral()
+    maven {
+        url "https://artifacts.stripe.com/maven"
+        credentials {
+            // Make sure you pass your secret key via gradle.properties or -P flag
+            username = "x-access-token"
+            password = project.findProperty("STRIPE_SECRET_KEY") ?: ""
+        }
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -137,10 +151,21 @@ dependencies {
     implementation "com.squareup.retrofit2:retrofit:$retrofit_version"
     implementation "com.squareup.retrofit2:converter-gson:$retrofit_version"
 
-    implementation "com.stripe.stripeterminal:stripeterminal-core:4.5.0"
-    implementation "com.stripe.stripeterminal:stripeterminal-taptopay:4.5.0"
-    implementation "com.stripe.stripeterminal:stripeterminal-external:4.5.0"
+    // implementation "com.stripe.stripeterminal:stripeterminal-core:4.5.0"
+    // implementation "com.stripe.stripeterminal:stripeterminal-taptopay:4.5.0"
+    // implementation "com.stripe.stripeterminal:stripeterminal-external:4.5.0"
 
+
+    //last update
+    // implementation "com.stripe.stripeterminal:stripeterminal-core:4.5.0"
+    // implementation "com.stripe.stripeterminal:stripeterminal-taptopay:4.5.0"
+    
+    //14-07-2025 update
+    // implementation("com.stripe:stripeterminal-taptopay:4.5.1")
+    // implementation("com.stripe:stripeterminal-core:4.5.1")
+    
+    implementation("com.stripe.stripeterminal:stripeterminal-core:4.5.1")
+    implementation("com.stripe.stripeterminal:stripeterminal-taptopay:4.5.1")
 
   
     // ✅ Hermes or JSC

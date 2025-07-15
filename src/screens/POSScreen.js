@@ -3,7 +3,6 @@ import {
   View,
   Text,
   Button,
-  FlatList,
   Alert,
   StyleSheet,
   PermissionsAndroid,
@@ -11,117 +10,95 @@ import {
 } from "react-native";
 import * as Tap from "../StripeTapToPay";
 
+// Request necessary Android permissions
 async function ensurePermissions() {
   if (Platform.OS !== "android") {
     return true;
   }
-
-  // Build an array of the permission constants you want to ask for...
   const wanted = [
     PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
     PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
     PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
     PermissionsAndroid.PERMISSIONS.NFC,
-  ];
+  ].filter(p => !!p);
 
-  // ...but drop any that are undefined / null
-  const toRequest = wanted.filter(p => !!p);
-
-  // Now request only the valid ones
-  const results = await PermissionsAndroid.requestMultiple(toRequest);
-
-  // See if all were granted
+  const results = await PermissionsAndroid.requestMultiple(wanted);
   const allGranted = Object.values(results).every(
     status => status === PermissionsAndroid.RESULTS.GRANTED
   );
   if (!allGranted) {
     Alert.alert(
       "Permissions Required",
-      "Location, Bluetooth, and NFC (if available) permissions are required for Tap-to-Pay."
+      "Location, Bluetooth, and NFC permissions are required for Tap to Pay."
     );
   }
   return allGranted;
 }
 
 export default function POSScreen({ route }) {
-  // fallback if route.params is undefined
-  const locationId = route?.params?.locationId ?? "tml_GFZlfAmzFCGtcQ";
-  const [readers, setReaders] = useState([]);
-  const [connectedReaderId, setConnectedReaderId] = useState(null);
-  const [isProcessing, setProcessing] = useState(false);
+  // You can pass a clientSecret via navigation params or fetch from your backend
+  const clientSecret = route?.params?.clientSecret;
+  const [status, setStatus] = useState("Initializing…");
 
   useEffect(() => {
-    // 1) Ask for Android permissions, then initialize & discover
     ensurePermissions().then(granted => {
       if (!granted) return;
+      // Initialize Tap to Pay
       Tap.initialize()
-        .then(() => Tap.discoverReaders(locationId, setReaders))
-        .catch(err => Alert.alert("Init error", err.message));
+        .then(() => {
+          // Subscribe to events
+          Tap.removeAllListeners("tapToPayStarted");
+          Tap.removeAllListeners("tapToPayFinished");
+          Tap.removeAllListeners("tapToPayCancelled");
+          Tap.removeAllListeners("tapToPayError");
+
+          Tap.addListener("tapToPayStarted", () => setStatus("Ready to Tap"));
+          Tap.addListener("tapToPayFinished", data => setStatus(`Success: ${data.status}`));
+          Tap.addListener("tapToPayCancelled", () => setStatus("Cancelled"));
+          Tap.addListener("tapToPayError", err => setStatus(`Error: ${err.message}`));
+
+          setStatus("Initialized");
+        })
+        .catch(err => {
+          Alert.alert("Init error", err.message);
+          setStatus("Init error");
+        });
     });
-  }, [locationId]);
+    // Clean up on unmount
+    return () => {
+      [
+        "tapToPayStarted",
+        "tapToPayFinished",
+        "tapToPayCancelled",
+        "tapToPayError"
+      ].forEach(evt => Tap.removeAllListeners(evt));
+    };
+  }, []);
 
-  const handleConnect = () => {
-    setProcessing(true);
-    Tap.connectReader(locationId)  // Only pass locationId
-      .then(() => {
-        setConnectedReaderId("local-mobile");  // You can hardcode it for now
-        Alert.alert("Connected", "Reader connected");
-      })
-      .catch(err => Alert.alert("Connect error", err.message))
-      .finally(() => setProcessing(false));
-  };
-
-  const handlePayment = () => {
-    if (!connectedReaderId) {
-      return Alert.alert("No Reader", "Please connect first");
+  const onTapToPayPress = () => {
+    if (!clientSecret) {
+      return Alert.alert("Error", "Missing clientSecret for PaymentIntent.");
     }
-    setProcessing(true);
-    Tap.collectAndProcessPayment(1.0, "usd", true)
-      .then(() => Alert.alert("Success", "Payment complete"))
-      .catch(err => Alert.alert("Payment error", err.message))
-      .finally(() => setProcessing(false));
+    setStatus("Waiting for tap…");
+    Tap.startTapToPay(clientSecret).catch(e => {
+      Alert.alert("Tap-to-Pay failed", e.message);
+      setStatus("Error");
+    });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Available Readers</Text>
-      <FlatList
-        data={readers}
-        keyExtractor={(item, index) => `reader-${index}`}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={styles.label}>{item.label}</Text>
-            <Button
-              title={connectedReaderId ? "Connected" : "Connect"}
-              disabled={connectedReaderId != null || isProcessing}
-              onPress={handleConnect}
-            />
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.empty}>No readers yet</Text>}
+      <Text style={styles.status}>Status: {status}</Text>
+      <Button
+        title="Tap to Pay"
+        onPress={onTapToPayPress}
+        disabled={status !== "Initialized" && status !== "Ready to Tap"}
       />
-      <View style={styles.footer}>
-        <Button
-          title="Tap to Pay $1.00"
-          disabled={!connectedReaderId || isProcessing}
-          onPress={handlePayment}
-        />
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex:1, padding:16, backgroundColor:"#fff" },
-  title: { fontSize:18, fontWeight:"600", marginBottom:12 },
-  row: {
-    flexDirection:"row",
-    justifyContent:"space-between",
-    paddingVertical:8,
-    borderBottomWidth:1,
-    borderBottomColor:"#eee"
-  },
-  label: { fontSize:16 },
-  empty: { textAlign:"center", color:"#888", marginTop:20 },
-  footer: { marginTop:24 },
+  container: { flex: 1, padding: 16, justifyContent: "center", backgroundColor: "#fff" },
+  status: { fontSize: 16, marginBottom: 12 },
 });
